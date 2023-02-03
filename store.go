@@ -6,12 +6,12 @@ package sessions
 
 import (
 	"encoding/base32"
-	"github.com/sujit-baniya/sessions/securecookie"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/sujit-baniya/sessions/securecookie"
 )
 
 // Store is an interface for custom session stores.
@@ -97,10 +97,14 @@ func (s *CookieStore) New(r *http.Request, name string) (*Session, error) {
 }
 
 // Save adds a single session to the response.
-func (s *CookieStore) Save(r *http.Request, w http.ResponseWriter,
-	session *Session) error {
-	encoded, err := securecookie.EncodeMulti(session.Name(), session.Values,
-		s.Codecs...)
+func (s *CookieStore) Save(r *http.Request, w http.ResponseWriter, session *Session) error {
+	if session.ID == "" {
+		// Because the ID is used in the filename, encode it to
+		// use alphanumeric characters only.
+		session.ID = base32RawStdEncoding.EncodeToString(
+			securecookie.GenerateRandomKey(32))
+	}
+	encoded, err := securecookie.EncodeMulti(session.Name(), session.Values, s.Codecs...)
 	if err != nil {
 		return err
 	}
@@ -204,11 +208,16 @@ var base32RawStdEncoding = base32.StdEncoding.WithPadding(base32.NoPadding)
 // Save adds a single session to the response.
 //
 // If the Options.MaxAge of the session is <= 0 then the session file will be
-// deleted from the store path. With this process it enforces the properly
+// deleted from the store path. With this process it enforces the proper
 // session cookie handling so no need to trust in the cookie management in the
 // web browser.
-func (s *FilesystemStore) Save(r *http.Request, w http.ResponseWriter,
-	session *Session) error {
+func (s *FilesystemStore) Save(r *http.Request, w http.ResponseWriter, session *Session) error {
+	if session.ID == "" {
+		// Because the ID is used in the filename, encode it to
+		// use alphanumeric characters only.
+		session.ID = base32RawStdEncoding.EncodeToString(
+			securecookie.GenerateRandomKey(32))
+	}
 	// Delete if max-age is <= 0
 	if session.Options.MaxAge <= 0 {
 		if err := s.erase(session); err != nil {
@@ -216,13 +225,6 @@ func (s *FilesystemStore) Save(r *http.Request, w http.ResponseWriter,
 		}
 		http.SetCookie(w, NewCookie(session.Name(), "", session.Options))
 		return nil
-	}
-
-	if session.ID == "" {
-		// Because the ID is used in the filename, encode it to
-		// use alphanumeric characters only.
-		session.ID = base32RawStdEncoding.EncodeToString(
-			securecookie.GenerateRandomKey(32))
 	}
 	if err := s.save(session); err != nil {
 		return err
@@ -260,7 +262,7 @@ func (s *FilesystemStore) save(session *Session) error {
 	filename := filepath.Join(s.path, "session_"+session.ID)
 	fileMutex.Lock()
 	defer fileMutex.Unlock()
-	return ioutil.WriteFile(filename, []byte(encoded), 0600)
+	return os.WriteFile(filename, []byte(encoded), 0600)
 }
 
 // load reads a file and decodes its content into session.Values.
@@ -268,7 +270,7 @@ func (s *FilesystemStore) load(session *Session) error {
 	filename := filepath.Join(s.path, "session_"+session.ID)
 	fileMutex.RLock()
 	defer fileMutex.RUnlock()
-	fdata, err := ioutil.ReadFile(filename)
+	fdata, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}
