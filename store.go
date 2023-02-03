@@ -136,11 +136,16 @@ var fileMutex sync.RWMutex
 // it will use os.TempDir().
 //
 // See NewCookieStore() for a description of the other parameters.
-func NewFilesystemStore(path string, keyPairs ...[]byte) *FilesystemStore {
+func NewFilesystemStore(name, path string, keyPairs ...[]byte) *FilesystemStore {
 	if path == "" {
 		path = os.TempDir()
 	}
+	if name == "" {
+		name = "session"
+	}
+	name = name + "_"
 	fs := &FilesystemStore{
+		name:   name,
 		Codecs: securecookie.CodecsFromPairs(keyPairs...),
 		Options: &Options{
 			Path:   "/",
@@ -159,6 +164,7 @@ func NewFilesystemStore(path string, keyPairs ...[]byte) *FilesystemStore {
 //
 // This store is still experimental and not well tested. Feedback is welcome.
 type FilesystemStore struct {
+	name    string
 	Codecs  []securecookie.Codec
 	Options *Options // default configuration
 	path    string
@@ -259,7 +265,7 @@ func (s *FilesystemStore) save(session *Session) error {
 	if err != nil {
 		return err
 	}
-	filename := filepath.Join(s.path, "session_"+session.ID)
+	filename := filepath.Join(s.path, s.name+session.ID)
 	fileMutex.Lock()
 	defer fileMutex.Unlock()
 	return os.WriteFile(filename, []byte(encoded), 0600)
@@ -267,7 +273,7 @@ func (s *FilesystemStore) save(session *Session) error {
 
 // load reads a file and decodes its content into session.Values.
 func (s *FilesystemStore) load(session *Session) error {
-	filename := filepath.Join(s.path, "session_"+session.ID)
+	filename := filepath.Join(s.path, s.name+session.ID)
 	fileMutex.RLock()
 	defer fileMutex.RUnlock()
 	fdata, err := os.ReadFile(filename)
@@ -283,7 +289,7 @@ func (s *FilesystemStore) load(session *Session) error {
 
 // delete session file
 func (s *FilesystemStore) erase(session *Session) error {
-	filename := filepath.Join(s.path, "session_"+session.ID)
+	filename := filepath.Join(s.path, s.name+session.ID)
 
 	fileMutex.RLock()
 	defer fileMutex.RUnlock()
