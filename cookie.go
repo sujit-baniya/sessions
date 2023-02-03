@@ -2,7 +2,7 @@ package sessions
 
 import "net/http"
 
-// newCookieFromOptions returns an http.Cookie with the options set.
+// newCookieFromOptions returns a http.Cookie with the options set.
 func newCookieFromOptions(name, value string, options *Options) *http.Cookie {
 	return &http.Cookie{
 		Name:     name,
@@ -14,5 +14,4 @@ func newCookieFromOptions(name, value string, options *Options) *http.Cookie {
 		HttpOnly: options.HttpOnly,
 		SameSite: options.SameSite,
 	}
-
 }
